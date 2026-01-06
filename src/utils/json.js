@@ -1,22 +1,17 @@
-export function safeJsonParse(value, fallback = []) {
-    if (!value) return fallback;
-
-    // Already parsed (MySQL JSON column may return object)
+export function safeJsonParse(value) {
     if (Array.isArray(value)) return value;
 
-    if (typeof value === "object") return value;
+    if (typeof value !== "string") return [];
 
-    if (typeof value === "string") {
-        try {
-            return JSON.parse(value);
-        } catch {
-            // Legacy comma-separated fallback
-            return value
-                .split(",")
-                .map(v => v.trim())
-                .filter(Boolean);
-        }
-    }
+    // Try JSON first
+    try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed;
+    } catch (_) {}
 
-    return fallback;
+    // Fallback: comma-separated string
+    return value
+        .split(",")
+        .map(v => v.trim())
+        .filter(Boolean);
 }

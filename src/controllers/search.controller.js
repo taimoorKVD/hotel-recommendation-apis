@@ -2,24 +2,37 @@ import { searchHotels } from "../services/search.service.js";
 import { logEvent } from "../repositories/events.repo.js";
 
 export async function search(req, res) {
-    const ab_group = req.headers["x-ab-group"] || "A";
-    const user_id = req.headers["x-user-id"] || "anon";
+    try {
+        const context = {
+            ab_group: req.headers["x-ab-group"] || "A",
+            user_id: req.headers["x-user-id"] || "anon",
+        };
 
-    const result = await searchHotels({
-        ...req.body,
-        ab_group,
-        user_id,
-    });
+        const result = await searchHotels(req.body, context);
 
-    // 🔴 Non-blocking impression logging
-    result.hotels.forEach(hotel => {
-        logEvent({
-            user_id,
-            hotel_id: hotel.id,
-            event_type: "impression",
-            ab_group,
-        }).catch(() => {});
-    });
+        const hotels = Array.isArray(result?.hotels) ? result.hotels : [];
 
-    res.json({ success: true, ab_group, ...result });
+        // 🔴 Non-blocking impression logging (SAFE)
+        hotels.forEach(hotel => {
+            logEvent({
+                user_id: context.user_id,
+                hotel_id: hotel.id,
+                event_type: "impression",
+                ab_group: context.ab_group,
+            }).catch(() => {});
+        });
+
+        res.json({
+            success: true,
+            ab_group: context.ab_group,
+            ...result,
+            hotels,
+            total_results: hotels.length,
+        });
+    } catch (err) {
+        console.error("Search controller error:", err);
+        res.status(500).json({
+            error: err.message || "Search failed",
+        });
+    }
 }

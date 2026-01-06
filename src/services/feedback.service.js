@@ -1,4 +1,5 @@
 import { getPool } from "../config/db.js";
+import {safeJsonParse} from "../utils/json.js";
 
 export async function buildUserPreferenceText(user_id, days = 90) {
     const pool = getPool();
@@ -24,7 +25,7 @@ export async function buildUserPreferenceText(user_id, days = 90) {
 
         return `
 User ${weight} ${r.hotel_type} hotels in ${r.city}.
-Amenities: ${JSON.parse(r.amenities || "[]").join(", ")}.
+Amenities: ${safeJsonParse(r.amenities)}.
 `;
     });
 }

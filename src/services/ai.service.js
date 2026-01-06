@@ -1,4 +1,5 @@
 import { openai } from "../config/openai.js";
+import {safeJsonParse} from "../utils/json.js";
 
 export async function getAIRecommendations(userQuery, availableHotels) {
     try {
@@ -10,7 +11,7 @@ export async function getAIRecommendations(userQuery, availableHotels) {
             price: h.price_per_night,
             rating: h.star_rating,
             type: h.hotel_type,
-            amenities: Array.isArray(h.amenities) ? h.amenities : [],
+            amenities: safeJsonParse(h.amenities),
         }));
 
         const prompt = `

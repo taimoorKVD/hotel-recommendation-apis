@@ -1,38 +1,54 @@
-export function extractUserIntent(query) {
-    const lower = query.toLowerCase();
+import { createEmbedding } from "./embedding.service.js";
+import { cosineSimilarity } from "../utils/math.util.js";
 
-    // Result count detection
-    let desiredCount = 5;
+/**
+ * Semantic intent anchors
+ */
+const INTENT_ANCHORS = {
+    budget: "cheap affordable low cost budget hotel",
+    luxury: "luxury premium five star high end hotel",
+    comfort: "comfortable cozy relaxing hotel",
+    family: "family friendly kids children hotel",
+    business: "business travel conference work hotel",
+    romantic: "romantic honeymoon couple getaway hotel",
+};
 
-    const countMatch = lower.match(/(\d+)\s*(hotel|hotels|options|results)/);
-    if (countMatch) {
-        desiredCount = parseInt(countMatch[1], 10);
-    } else if (lower.includes("few")) {
-        desiredCount = 3;
-    } else if (lower.includes("many")) {
-        desiredCount = 10;
+let anchorVectors = null;
+
+async function loadAnchorVectors() {
+    if (anchorVectors) return anchorVectors;
+
+    anchorVectors = {};
+
+    for (const [intent, text] of Object.entries(INTENT_ANCHORS)) {
+        try {
+            const vec = await createEmbedding(text);
+            if (Array.isArray(vec)) {
+                anchorVectors[intent] = vec;
+            }
+        } catch (err) {
+            console.warn(`⚠️ Failed to embed intent anchor: ${intent}`);
+        }
     }
 
-    // Safety limits
-    desiredCount = Math.min(Math.max(desiredCount, 1), 20);
+    return anchorVectors;
+}
 
-    // Budget intent
-    let budget = "any";
-    if (lower.includes("cheap") || lower.includes("budget") || lower.includes("low price")) {
-        budget = "low";
-    } else if (lower.includes("luxury") || lower.includes("premium")) {
-        budget = "high";
+/**
+ * Infer continuous intent signals
+ * NEVER throws
+ */
+export async function inferIntentSignals(queryEmbedding) {
+    if (!Array.isArray(queryEmbedding)) {
+        return {};
     }
 
-    // Comfort / type intent
-    let comfort = "any";
-    if (lower.includes("comfortable") || lower.includes("cozy")) {
-        comfort = "comfort";
+    const anchors = await loadAnchorVectors();
+    const signals = {};
+
+    for (const [intent, vector] of Object.entries(anchors)) {
+        signals[intent] = cosineSimilarity(queryEmbedding, vector);
     }
 
-    return {
-        desiredCount,
-        budget,
-        comfort,
-    };
+    return signals;
 }
